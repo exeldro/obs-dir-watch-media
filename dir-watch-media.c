@@ -58,6 +58,7 @@ enum sort_by {
 	alphabetically_first,
 	alphabetically_last,
 };
+
 struct dir_watch_media_source {
 	obs_source_t *source;
 	char *directory;
@@ -180,8 +181,10 @@ static void *dir_watch_media_source_create(obs_data_t *settings,
 static void dir_watch_media_source_destroy(void *data)
 {
 	struct dir_watch_media_source *context = data;
-	if (context->directory)
-		bfree(context->directory);
+	bfree(context->directory);
+	bfree(context->extension);
+	bfree(context->filter);
+	bfree(context->file);
 	bfree(context);
 }
 
@@ -239,8 +242,8 @@ void dir_watch_media_source_render(void *data, gs_effect_t *effect)
 		return;
 
 	struct dstr dir_path;
-	dstr_init(&dir_path);
 	struct dstr selected_path;
+	dstr_init(&dir_path);
 	dstr_init(&selected_path);
 	time_t time = context->time;
 	char *file = NULL;
@@ -270,15 +273,13 @@ void dir_watch_media_source_render(void *data, gs_effect_t *effect)
 
 		if (context->sort_by == alphabetically_first) {
 			if (!file || astrcmpi(file, ent->d_name) >= 0) {
-				if (file)
-					bfree(file);
+				bfree(file);
 				file = bstrdup(ent->d_name);
 				dstr_copy_dstr(&selected_path, &dir_path);
 			}
 		} else if (context->sort_by == alphabetically_last) {
 			if (!file || astrcmpi(file, ent->d_name) <= 0) {
-				if (file)
-					bfree(file);
+				bfree(file);
 				file = bstrdup(ent->d_name);
 				dstr_copy_dstr(&selected_path, &dir_path);
 			}
@@ -321,9 +322,9 @@ void dir_watch_media_source_render(void *data, gs_effect_t *effect)
 		}
 		ent = os_readdir(dir);
 	}
+
 	context->time = time;
-	if (file)
-		bfree(file);
+	bfree(file);
 	dstr_free(&dir_path);
 	os_closedir(dir);
 	if (!selected_path.array || !selected_path.len) {
@@ -340,10 +341,9 @@ void dir_watch_media_source_render(void *data, gs_effect_t *effect)
 		return;
 	}
 	fclose(f);
-	if (context->file)
-		bfree(context->file);
+	bfree(context->file);
 	context->file = bstrdup(selected_path.array);
-
+	dstr_free(&selected_path);
 	obs_source_t *parent = obs_filter_get_parent(context->source);
 	if (!parent) {
 		return;
@@ -362,7 +362,7 @@ void dir_watch_media_source_render(void *data, gs_effect_t *effect)
 		}
 	} else if (strcmp(id, S_VLC_SOURCE) == 0) {
 		obs_data_array_t *array =
-		    obs_data_get_array(settings, S_PLAYLIST);
+		        obs_data_get_array(settings, S_PLAYLIST);
 		if (!array) {
 			array = obs_data_array_create();
 			obs_data_set_array(settings, S_PLAYLIST, array);
