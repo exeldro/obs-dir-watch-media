@@ -13,6 +13,43 @@
 #define info(format, ...) blog(LOG_INFO, format, ##__VA_ARGS__)
 #define warn(format, ...) blog(LOG_WARNING, format, ##__VA_ARGS__)
 
+#if __linux__
+/* stracsecmp is the POSIX version of strcmpi */
+#define strcmpi strcasecmp
+#endif
+
+/* Settings */
+#define S_DWM_ID			"dir_watch_media"
+#define S_DIRECTORY			"dir"
+#define S_SORT_BY			"sort_by"
+#define S_FILTER			"filter"
+#define S_EXTENSION			"extension"
+#define S_FFMPEG_SOURCE		"ffmpeg_source"
+#define S_LOCAL_FILE		"local_file"
+#define S_IS_LOCAL_FILE 	"is_local_file"
+#define S_RESTART			"restart"
+#define S_VLC_SOURCE		"vlc_source"
+#define S_PLAYLIST			"playlist"
+#define S_VALUE				"value"
+#define S_SORT_BY			"sort_by"
+#define S_HOTKEY_ID			"dwm_clear"
+
+/* Translation */
+#define T_(s)				obs_module_text(s)
+#define T_DIRECTORY			T_("Directory")
+#define T_DWM_DESCRIPTION	T_("DWM.Description")
+#define T_NAME				T_("DWM.Name")
+#define T_HOTKEY_NAME 		T_("DWM.Clear")
+#define T_SORT_BY			T_("DWM.SortBy")
+#define T_CREATED_NEWEST	T_("DWM.Created.Newest")
+#define T_CREATED_OLDEST	T_("DWM.Created.Oldest")
+#define T_MODIFIED_NEWEST	T_("DWM.Modified.Newest")
+#define T_MODIFIED_OLDEST	T_("DWM.Modified.Oldest")
+#define T_ALPHA_FIRST		T_("DWM.Alphabetically.First")
+#define T_ALPHA_LAST		T_("DWM.Alphabetically.Last")
+#define T_EXTENSION			T_("DWM.Extension")
+#define T_FILTER			T_("DWM.Filter")
+
 enum sort_by {
 	created_newest,
 	created_oldest,
@@ -35,26 +72,26 @@ struct dir_watch_media_source {
 static const char *dir_watch_media_source_get_name(void *unused)
 {
 	UNUSED_PARAMETER(unused);
-	return "Directory watch media";
+	return T_NAME;
 }
 
 static void dir_watch_media_source_update(void *data, obs_data_t *settings)
 {
 	struct dir_watch_media_source *context = data;
-	const char *dir = obs_data_get_string(settings, "dir");
+	const char *dir = obs_data_get_string(settings, S_DIRECTORY);
 
 	if (!context->directory || strcmp(dir, context->directory) != 0) {
 		if (context->directory)
 			bfree(context->directory);
 		context->directory = bstrdup(dir);
 	}
-	const enum sort_by sort_by = obs_data_get_int(settings, "sort_by");
+	const enum sort_by sort_by = obs_data_get_int(settings, S_SORT_BY);
 	if (sort_by != context->sort_by) {
 		context->sort_by = sort_by;
 		context->time = 0;
 	}
 
-	const char *filter = obs_data_get_string(settings, "filter");
+	const char *filter = obs_data_get_string(settings, S_FILTER);
 	if (!context->filter || strcmp(filter, context->filter) != 0) {
 		if (context->filter) {
 			bfree(context->filter);
@@ -67,7 +104,7 @@ static void dir_watch_media_source_update(void *data, obs_data_t *settings)
 		}
 	}
 
-	const char *extension = obs_data_get_string(settings, "extension");
+	const char *extension = obs_data_get_string(settings, S_EXTENSION);
 	if (!context->extension || strcmp(extension, context->extension) != 0) {
 		if (context->extension) {
 			bfree(context->extension);
@@ -82,9 +119,9 @@ static void dir_watch_media_source_update(void *data, obs_data_t *settings)
 }
 
 static void dir_watch_media_clear(void *data, obs_hotkey_id hotkey_id,
-				  obs_hotkey_t *hotkey, bool pressed)
+                  obs_hotkey_t *hotkey, bool pressed)
 {
-	struct dir_watch_media_source *context = data;
+    struct dir_watch_media_source *context = data;
 
 	if (!pressed)
 		return;
@@ -96,22 +133,22 @@ static void dir_watch_media_clear(void *data, obs_hotkey_id hotkey_id,
 
 	obs_data_t *settings = obs_source_get_settings(parent);
 	const char *id = obs_source_get_id(parent);
-	if (strcmp(id, "ffmpeg_source") == 0) {
-		obs_data_set_string(settings, "local_file", "");
-		obs_data_set_bool(settings, "is_local_file", true);
+	if (strcmp(id, S_FFMPEG_SOURCE) == 0) {
+		obs_data_set_string(settings, S_LOCAL_FILE, "");
+		obs_data_set_bool(settings, S_IS_LOCAL_FILE, true);
 		obs_source_update(parent, settings);
 		proc_handler_t *ph = obs_source_get_proc_handler(parent);
 		if (ph) {
 			calldata_t cd = {0};
-			proc_handler_call(ph, "restart", &cd);
+			proc_handler_call(ph, S_RESTART, &cd);
 			calldata_free(&cd);
 		}
-	} else if (strcmp(id, "vlc_source") == 0) {
+	} else if (strcmp(id, S_VLC_SOURCE) == 0) {
 		obs_data_array_t *array =
-			obs_data_get_array(settings, "playlist");
+		    obs_data_get_array(settings, S_PLAYLIST);
 		if (!array) {
 			array = obs_data_array_create();
-			obs_data_set_array(settings, "playlist", array);
+			obs_data_set_array(settings, S_PLAYLIST, array);
 		}
 		bool twice = false;
 		size_t count = obs_data_array_count(array);
@@ -126,14 +163,14 @@ static void dir_watch_media_clear(void *data, obs_hotkey_id hotkey_id,
 
 static void dir_watch_media_source_defaults(obs_data_t *settings)
 {
-	obs_data_set_default_int(settings, "sort_by", modified_newest);
+    obs_data_set_default_int(settings, S_SORT_BY, modified_newest);
 }
 
 static void *dir_watch_media_source_create(obs_data_t *settings,
-					   obs_source_t *source)
+                       obs_source_t *source)
 {
 	struct dir_watch_media_source *context =
-		bzalloc(sizeof(struct dir_watch_media_source));
+	    bzalloc(sizeof(struct dir_watch_media_source));
 	context->source = source;
 
 	dir_watch_media_source_update(context, settings);
@@ -158,8 +195,8 @@ static void dir_watch_media_source_tick(void *data, float seconds)
 		return;
 
 	context->hotkeys_added = true;
-	obs_hotkey_register_source(parent, "DirWatchMedia.Clear", "Clear",
-				   dir_watch_media_clear, context);
+	obs_hotkey_register_source(parent, S_HOTKEY_ID, T_HOTKEY_NAME,
+	               dir_watch_media_clear, context);
 }
 
 static obs_properties_t *dir_watch_media_source_properties(void *data)
@@ -168,24 +205,24 @@ static obs_properties_t *dir_watch_media_source_properties(void *data)
 
 	obs_properties_t *props = obs_properties_create();
 
-	obs_properties_add_path(props, "dir", obs_module_text("Directory"),
-				OBS_PATH_DIRECTORY, NULL, s->directory);
-	obs_property_t *prop = obs_properties_add_list(props, "sort_by",
-						       "Sort by",
-						       OBS_COMBO_TYPE_LIST,
-						       OBS_COMBO_FORMAT_INT);
-	obs_property_list_add_int(prop, "Created newest", created_newest);
-	obs_property_list_add_int(prop, "Created oldest", created_oldest);
-	obs_property_list_add_int(prop, "Modified newest", modified_newest);
-	obs_property_list_add_int(prop, "Modified oldest", modified_oldest);
-	obs_property_list_add_int(prop, "Alphabetically first",
-				  alphabetically_first);
-	obs_property_list_add_int(prop, "Alphabetically last",
-				  alphabetically_last);
+	obs_properties_add_path(props, S_DIRECTORY, T_DIRECTORY,
+	            OBS_PATH_DIRECTORY, NULL, s->directory);
+	obs_property_t *prop = obs_properties_add_list(props, S_SORT_BY,
+	                           T_SORT_BY,
+	                           OBS_COMBO_TYPE_LIST,
+	                           OBS_COMBO_FORMAT_INT);
+	obs_property_list_add_int(prop, T_CREATED_NEWEST, created_newest);
+	obs_property_list_add_int(prop, T_CREATED_OLDEST, created_oldest);
+	obs_property_list_add_int(prop, T_MODIFIED_NEWEST, modified_newest);
+	obs_property_list_add_int(prop, T_MODIFIED_OLDEST, modified_oldest);
+	obs_property_list_add_int(prop, T_ALPHA_FIRST,
+	              alphabetically_first);
+	obs_property_list_add_int(prop, T_ALPHA_LAST,
+	              alphabetically_last);
 
-	obs_properties_add_text(props, "extension", "Extension",
-				OBS_TEXT_DEFAULT);
-	obs_properties_add_text(props, "filter", "Filter", OBS_TEXT_DEFAULT);
+	obs_properties_add_text(props, S_EXTENSION, T_EXTENSION,
+	            OBS_TEXT_DEFAULT);
+	obs_properties_add_text(props, S_FILTER, T_FILTER, OBS_TEXT_DEFAULT);
 	return props;
 }
 
@@ -253,30 +290,30 @@ void dir_watch_media_source_render(void *data, gs_effect_t *effect)
 					if (time == 0 ||
 					    stats.st_ctime >= time) {
 						dstr_copy_dstr(&selected_path,
-							       &dir_path);
+						           &dir_path);
 						time = stats.st_ctime;
 					}
 				} else if (context->sort_by == created_oldest) {
 					if (time == 0 ||
 					    stats.st_ctime <= time) {
 						dstr_copy_dstr(&selected_path,
-							       &dir_path);
+						           &dir_path);
 						time = stats.st_ctime;
 					}
 				} else if (context->sort_by ==
-					   modified_newest) {
+				       modified_newest) {
 					if (time == 0 ||
 					    stats.st_mtime >= time) {
 						dstr_copy_dstr(&selected_path,
-							       &dir_path);
+						           &dir_path);
 						time = stats.st_mtime;
 					}
 				} else if (context->sort_by ==
-					   modified_oldest) {
+				       modified_oldest) {
 					if (time == 0 ||
 					    stats.st_mtime <= time) {
 						dstr_copy_dstr(&selected_path,
-							       &dir_path);
+						           &dir_path);
 						time = stats.st_mtime;
 					}
 				}
@@ -313,36 +350,36 @@ void dir_watch_media_source_render(void *data, gs_effect_t *effect)
 	}
 	obs_data_t *settings = obs_source_get_settings(parent);
 	const char *id = obs_source_get_id(parent);
-	if (strcmp(id, "ffmpeg_source") == 0) {
-		obs_data_set_string(settings, "local_file", context->file);
-		obs_data_set_bool(settings, "is_local_file", true);
+	if (strcmp(id, S_FFMPEG_SOURCE) == 0) {
+		obs_data_set_string(settings, S_LOCAL_FILE, context->file);
+		obs_data_set_bool(settings, S_IS_LOCAL_FILE, true);
 		obs_source_update(parent, settings);
 		proc_handler_t *ph = obs_source_get_proc_handler(parent);
 		if (ph) {
 			calldata_t cd = {0};
-			proc_handler_call(ph, "restart", &cd);
+			proc_handler_call(ph, S_RESTART, &cd);
 			calldata_free(&cd);
 		}
-	} else if (strcmp(id, "vlc_source") == 0) {
+	} else if (strcmp(id, S_VLC_SOURCE) == 0) {
 		obs_data_array_t *array =
-			obs_data_get_array(settings, "playlist");
+		    obs_data_get_array(settings, S_PLAYLIST);
 		if (!array) {
 			array = obs_data_array_create();
-			obs_data_set_array(settings, "playlist", array);
+			obs_data_set_array(settings, S_PLAYLIST, array);
 		}
 		bool twice = false;
 		size_t count = obs_data_array_count(array);
 		for (size_t i = 0; i < count; i++) {
 			obs_data_t *item = obs_data_array_item(array, i);
-			if (strcmpi(obs_data_get_string(item, "value"),
-				    context->file) == 0) {
+			if (strcmpi(obs_data_get_string(item, S_VALUE),
+			        context->file) == 0) {
 				twice = true;
 			}
 			obs_data_release(item);
 		}
 		if (!twice) {
 			obs_data_t *item = obs_data_create();
-			obs_data_set_string(item, "value", context->file);
+			obs_data_set_string(item, S_VALUE, context->file);
 			obs_data_array_push_back(array, item);
 			obs_data_release(item);
 			obs_source_update(parent, settings);
@@ -352,12 +389,12 @@ void dir_watch_media_source_render(void *data, gs_effect_t *effect)
 	obs_data_release(settings);
 }
 static void dir_watch_media_source_filter_remove(void *data,
-						 obs_source_t *parent)
+                         obs_source_t *parent)
 {
 }
 
 struct obs_source_info dir_watch_media_info = {
-	.id = "dir_watch_media",
+	.id = S_DWM_ID,
 	.type = OBS_SOURCE_TYPE_FILTER,
 	.output_flags = OBS_SOURCE_VIDEO,
 	.get_name = dir_watch_media_source_get_name,
@@ -375,7 +412,7 @@ OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE("dir-watch-media", "en-US")
 MODULE_EXPORT const char *obs_module_description(void)
 {
-	return "Dir watch media";
+	return T_DWM_DESCRIPTION;
 }
 
 bool obs_module_load(void)
