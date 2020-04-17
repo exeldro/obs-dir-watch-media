@@ -12,7 +12,7 @@
 #define info(format, ...) blog(LOG_INFO, format, ##__VA_ARGS__)
 #define warn(format, ...) blog(LOG_WARNING, format, ##__VA_ARGS__)
 
-#if __linux__
+#if __linux__ || __APPLE__
 /* stracsecmp is the POSIX version of strcmpi */
 #define strcmpi strcasecmp
 #endif
