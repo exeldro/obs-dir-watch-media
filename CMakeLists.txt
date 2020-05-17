@@ -17,4 +17,5 @@ target_link_libraries(dir-watch-media
 	libobs
 	${dir-watch-media_PLATFORM_DEPS})
 
+set_target_properties(dir-watch-media PROPERTIES FOLDER "plugins/exeldro")
 install_obs_plugin_with_data(dir-watch-media data)
