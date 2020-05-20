@@ -10,6 +10,11 @@ set(dir-watch-media_HEADERS
 set(dir-watch-media_SOURCES
 	dir-watch-media.c)
 
+if(WIN32)
+	list(APPEND dir-watch-media_SOURCES
+		dir-watch-media.rc)
+endif()
+
 add_library(dir-watch-media MODULE
 	${dir-watch-media_HEADERS}
 	${dir-watch-media_SOURCES})
