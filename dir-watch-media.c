@@ -34,6 +34,8 @@
 #define S_CLEAR_HOTKEY_ID "dwm_clear"
 #define S_REMOVE_LAST_HOTKEY_ID "dwm_remove_last"
 #define S_REMOVE_FIRST_HOTKEY_ID "dwm_remove_first"
+#define S_DELETE_LAST_HOTKEY_ID "dwm_delete_last"
+#define S_DELETE_FIRST_HOTKEY_ID "dwm_delete_first"
 
 /* Translation */
 #define T_(s) obs_module_text(s)
@@ -43,6 +45,8 @@
 #define T_CLEAR_HOTKEY_NAME T_("DWM.Clear")
 #define T_REMOVE_LAST_HOTKEY_NAME T_("DWM.Remove.Last")
 #define T_REMOVE_FIRST_HOTKEY_NAME T_("DWM.Remove.First")
+#define T_DELETE_LAST_HOTKEY_NAME T_("DWM.Delete.Last")
+#define T_DELETE_FIRST_HOTKEY_NAME T_("DWM.Delete.First")
 #define T_SORT_BY T_("DWM.SortBy")
 #define T_CREATED_NEWEST T_("DWM.Created.Newest")
 #define T_CREATED_OLDEST T_("DWM.Created.Oldest")
@@ -68,6 +72,7 @@ struct dir_watch_media_source {
 	char *file;
 	char *filter;
 	char *extension;
+	char *delete_file;
 	enum sort_by sort_by;
 	time_t time;
 	bool hotkeys_added;
@@ -163,72 +168,88 @@ static void dir_watch_media_clear(void *data, obs_hotkey_id hotkey_id,
 		obs_data_array_release(array);
 	}
 	obs_data_release(settings);
+	UNUSED_PARAMETER(hotkey);
+	UNUSED_PARAMETER(hotkey_id);
+}
+
+static void dir_watch_media_remove(void *data, bool first, bool delete)
+{
+	struct dir_watch_media_source *context = data;
+
+	obs_source_t *parent = obs_filter_get_parent(context->source);
+	if (!parent) {
+		return;
+	}
+
+	obs_data_t *settings = obs_source_get_settings(parent);
+	const char *id = obs_source_get_unversioned_id(parent);
+	if (strcmp(id, S_VLC_SOURCE) != 0) {
+		obs_data_release(settings);
+		return;
+	}
+	obs_data_array_t *array = obs_data_get_array(settings, S_PLAYLIST);
+	if (!array) {
+		array = obs_data_array_create();
+		obs_data_set_array(settings, S_PLAYLIST, array);
+	}
+	const size_t count = obs_data_array_count(array);
+	if (count > 0) {
+		size_t index = first ? 0 : count - 1;
+		if (delete) {
+			obs_data_t *item = obs_data_array_item(array, index);
+			const char *filepath =
+				obs_data_get_string(item, S_VALUE);
+			if (filepath && os_file_exists(filepath)) {
+				if (context->delete_file)
+					bfree(context->delete_file);
+				context->delete_file = bstrdup(filepath);
+			}
+		}
+		obs_data_array_erase(array, index);
+	}
+	obs_source_update(parent, settings);
+	obs_data_array_release(array);
+	obs_data_release(settings);
 }
 
 static void dir_watch_media_remove_last(void *data, obs_hotkey_id hotkey_id,
 					obs_hotkey_t *hotkey, bool pressed)
 {
-	struct dir_watch_media_source *context = data;
-
 	if (!pressed)
 		return;
-
-	obs_source_t *parent = obs_filter_get_parent(context->source);
-	if (!parent) {
-		return;
-	}
-
-	obs_data_t *settings = obs_source_get_settings(parent);
-	const char *id = obs_source_get_unversioned_id(parent);
-	if (strcmp(id, S_VLC_SOURCE) != 0) {
-		obs_data_release(settings);
-		return;
-	}
-	obs_data_array_t *array = obs_data_get_array(settings, S_PLAYLIST);
-	if (!array) {
-		array = obs_data_array_create();
-		obs_data_set_array(settings, S_PLAYLIST, array);
-	}
-	const size_t count = obs_data_array_count(array);
-	if (count > 0) {
-		obs_data_array_erase(array, count - 1);
-	}
-	obs_source_update(parent, settings);
-	obs_data_array_release(array);
-	obs_data_release(settings);
+	dir_watch_media_remove(data, false, false);
+	UNUSED_PARAMETER(hotkey);
+	UNUSED_PARAMETER(hotkey_id);
 }
 
 static void dir_watch_media_remove_first(void *data, obs_hotkey_id hotkey_id,
 					 obs_hotkey_t *hotkey, bool pressed)
 {
-	struct dir_watch_media_source *context = data;
-
 	if (!pressed)
 		return;
+	dir_watch_media_remove(data, true, false);
+	UNUSED_PARAMETER(hotkey);
+	UNUSED_PARAMETER(hotkey_id);
+}
 
-	obs_source_t *parent = obs_filter_get_parent(context->source);
-	if (!parent) {
+static void dir_watch_media_delete_last(void *data, obs_hotkey_id hotkey_id,
+					obs_hotkey_t *hotkey, bool pressed)
+{
+	if (!pressed)
 		return;
-	}
+	dir_watch_media_remove(data, false, true);
+	UNUSED_PARAMETER(hotkey);
+	UNUSED_PARAMETER(hotkey_id);
+}
 
-	obs_data_t *settings = obs_source_get_settings(parent);
-	const char *id = obs_source_get_unversioned_id(parent);
-	if (strcmp(id, S_VLC_SOURCE) != 0) {
-		obs_data_release(settings);
+static void dir_watch_media_delete_first(void *data, obs_hotkey_id hotkey_id,
+					 obs_hotkey_t *hotkey, bool pressed)
+{
+	if (!pressed)
 		return;
-	}
-	obs_data_array_t *array = obs_data_get_array(settings, S_PLAYLIST);
-	if (!array) {
-		array = obs_data_array_create();
-		obs_data_set_array(settings, S_PLAYLIST, array);
-	}
-	const size_t count = obs_data_array_count(array);
-	if (count > 0) {
-		obs_data_array_erase(array, 0);
-	}
-	obs_source_update(parent, settings);
-	obs_data_array_release(array);
-	obs_data_release(settings);
+	dir_watch_media_remove(data, true, true);
+	UNUSED_PARAMETER(hotkey);
+	UNUSED_PARAMETER(hotkey_id);
 }
 
 static void dir_watch_media_source_defaults(obs_data_t *settings)
@@ -250,6 +271,7 @@ static void *dir_watch_media_source_create(obs_data_t *settings,
 static void dir_watch_media_source_destroy(void *data)
 {
 	struct dir_watch_media_source *context = data;
+	bfree(context->delete_file);
 	bfree(context->directory);
 	bfree(context->extension);
 	bfree(context->filter);
@@ -260,6 +282,15 @@ static void dir_watch_media_source_destroy(void *data)
 static void dir_watch_media_source_tick(void *data, float seconds)
 {
 	struct dir_watch_media_source *context = data;
+	if (context->delete_file) {
+		if (os_file_exists(context->delete_file)) {
+			os_unlink(context->delete_file);
+		} else {
+			bfree(context->delete_file);
+			context->delete_file = NULL;
+		}
+	}
+
 	if (context->hotkeys_added)
 		return;
 	obs_source_t *parent = obs_filter_get_parent(context->source);
@@ -279,6 +310,13 @@ static void dir_watch_media_source_tick(void *data, float seconds)
 	obs_hotkey_register_source(parent, S_REMOVE_FIRST_HOTKEY_ID,
 				   T_REMOVE_FIRST_HOTKEY_NAME,
 				   dir_watch_media_remove_first, context);
+
+	obs_hotkey_register_source(parent, S_DELETE_LAST_HOTKEY_ID,
+				   T_DELETE_LAST_HOTKEY_NAME,
+				   dir_watch_media_delete_last, context);
+	obs_hotkey_register_source(parent, S_DELETE_FIRST_HOTKEY_ID,
+				   T_DELETE_FIRST_HOTKEY_NAME,
+				   dir_watch_media_delete_first, context);
 }
 
 static obs_properties_t *dir_watch_media_source_properties(void *data)
