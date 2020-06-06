@@ -36,6 +36,7 @@
 #define S_REMOVE_FIRST_HOTKEY_ID "dwm_remove_first"
 #define S_DELETE_LAST_HOTKEY_ID "dwm_delete_last"
 #define S_DELETE_FIRST_HOTKEY_ID "dwm_delete_first"
+#define S_RANDOM_HOTKEY_ID "dwm_random"
 
 /* Translation */
 #define T_(s) obs_module_text(s)
@@ -43,6 +44,7 @@
 #define T_DWM_DESCRIPTION T_("DWM.Description")
 #define T_NAME T_("DWM.Name")
 #define T_CLEAR_HOTKEY_NAME T_("DWM.Clear")
+#define T_RANDOM_HOTKEY_NAME T_("DWM.Random")
 #define T_REMOVE_LAST_HOTKEY_NAME T_("DWM.Remove.Last")
 #define T_REMOVE_FIRST_HOTKEY_NAME T_("DWM.Remove.First")
 #define T_DELETE_LAST_HOTKEY_NAME T_("DWM.Delete.Last")
@@ -170,6 +172,105 @@ static void dir_watch_media_clear(void *data, obs_hotkey_id hotkey_id,
 	obs_data_release(settings);
 	UNUSED_PARAMETER(hotkey);
 	UNUSED_PARAMETER(hotkey_id);
+}
+
+static void dir_watch_media_random(void *data, obs_hotkey_id hotkey_id,
+				   obs_hotkey_t *hotkey, bool pressed)
+{
+	struct dir_watch_media_source *context = data;
+
+	if (!pressed)
+		return;
+
+	obs_source_t *parent = obs_filter_get_parent(context->source);
+	if (!parent) {
+		return;
+	}
+
+	if (!context->directory)
+		return;
+
+	os_dir_t *dir = os_opendir(context->directory);
+	if (!dir)
+		return;
+
+	struct dstr selected_path;
+	dstr_init(&selected_path);
+
+	long long count = 0;
+	struct os_dirent *ent = os_readdir(dir);
+	while (ent) {
+		if (ent->directory) {
+			ent = os_readdir(dir);
+			continue;
+		}
+		if (context->filter &&
+		    strstr(ent->d_name, context->filter) == NULL) {
+			ent = os_readdir(dir);
+			continue;
+		}
+		const char *extension = os_get_path_extension(ent->d_name);
+		if (context->extension && extension &&
+		    astrcmpi(context->extension, extension) != 0 &&
+		    astrcmpi(context->extension, extension + 1)) {
+			ent = os_readdir(dir);
+			continue;
+		}
+		count++;
+		const int r = rand();
+		if (count <= 1 || r % count == 0) {
+			dstr_copy(&selected_path, context->directory);
+			dstr_cat_ch(&selected_path, '/');
+			dstr_cat(&selected_path, ent->d_name);
+		}
+		ent = os_readdir(dir);
+	}
+	if (!count) {
+		dstr_free(&selected_path);
+		return;
+	}
+
+	obs_data_t *settings = obs_source_get_settings(parent);
+	const char *id = obs_source_get_unversioned_id(parent);
+	if (strcmp(id, S_FFMPEG_SOURCE) == 0) {
+		obs_data_set_string(settings, S_LOCAL_FILE,
+				    selected_path.array);
+		obs_data_set_bool(settings, S_IS_LOCAL_FILE, true);
+		obs_source_update(parent, settings);
+		proc_handler_t *ph = obs_source_get_proc_handler(parent);
+		if (ph) {
+			calldata_t cd = {0};
+			proc_handler_call(ph, S_RESTART, &cd);
+			calldata_free(&cd);
+		}
+	} else if (strcmp(id, S_VLC_SOURCE) == 0) {
+		obs_data_array_t *array =
+			obs_data_get_array(settings, S_PLAYLIST);
+		if (!array) {
+			array = obs_data_array_create();
+			obs_data_set_array(settings, S_PLAYLIST, array);
+		}
+		bool twice = false;
+		const size_t count = obs_data_array_count(array);
+		for (size_t i = 0; i < count; i++) {
+			obs_data_t *item = obs_data_array_item(array, i);
+			if (strcmpi(obs_data_get_string(item, S_VALUE),
+				    selected_path.array) == 0) {
+				twice = true;
+			}
+			obs_data_release(item);
+		}
+		if (!twice) {
+			obs_data_t *item = obs_data_create();
+			obs_data_set_string(item, S_VALUE, selected_path.array);
+			obs_data_array_push_back(array, item);
+			obs_data_release(item);
+			obs_source_update(parent, settings);
+		}
+		obs_data_array_release(array);
+	}
+	obs_data_release(settings);
+	dstr_free(&selected_path);
 }
 
 static void dir_watch_media_remove(void *data, bool first, bool delete)
@@ -300,6 +401,9 @@ static void dir_watch_media_source_tick(void *data, float seconds)
 	context->hotkeys_added = true;
 	obs_hotkey_register_source(parent, S_CLEAR_HOTKEY_ID,
 				   T_CLEAR_HOTKEY_NAME, dir_watch_media_clear,
+				   context);
+	obs_hotkey_register_source(parent, S_RANDOM_HOTKEY_ID,
+				   T_RANDOM_HOTKEY_NAME, dir_watch_media_random,
 				   context);
 	const char *id = obs_source_get_unversioned_id(parent);
 	if (strcmp(id, S_VLC_SOURCE) != 0)
