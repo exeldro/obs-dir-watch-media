@@ -30,6 +30,8 @@
 #define S_VLC_SOURCE "vlc_source"
 #define S_PLAYLIST "playlist"
 #define S_VALUE "value"
+#define S_IMAGE_SOURCE "image_source"
+#define S_FILE "file"
 #define S_SORT_BY "sort_by"
 #define S_CLEAR_HOTKEY_ID "dwm_clear"
 #define S_REMOVE_LAST_HOTKEY_ID "dwm_remove_last"
@@ -168,6 +170,9 @@ static void dir_watch_media_clear(void *data, obs_hotkey_id hotkey_id,
 		}
 		obs_source_update(parent, settings);
 		obs_data_array_release(array);
+	} else if (strcmp(id, S_IMAGE_SOURCE) == 0) {
+		obs_data_set_string(settings, S_FILE, "");
+		obs_source_update(parent, settings);
 	}
 	obs_data_release(settings);
 	UNUSED_PARAMETER(hotkey);
@@ -268,6 +273,9 @@ static void dir_watch_media_random(void *data, obs_hotkey_id hotkey_id,
 			obs_source_update(parent, settings);
 		}
 		obs_data_array_release(array);
+	} else if (strcmp(id, S_IMAGE_SOURCE) == 0) {
+		obs_data_set_string(settings, S_FILE, selected_path.array);
+		obs_source_update(parent, settings);
 	}
 	obs_data_release(settings);
 	dstr_free(&selected_path);
@@ -282,12 +290,11 @@ static void dir_watch_media_remove(void *data, bool first, bool delete)
 		return;
 	}
 
-	obs_data_t *settings = obs_source_get_settings(parent);
 	const char *id = obs_source_get_unversioned_id(parent);
 	if (strcmp(id, S_VLC_SOURCE) != 0) {
-		obs_data_release(settings);
 		return;
 	}
+	obs_data_t *settings = obs_source_get_settings(parent);
 	obs_data_array_t *array = obs_data_get_array(settings, S_PLAYLIST);
 	if (!array) {
 		array = obs_data_array_create();
@@ -604,6 +611,9 @@ void dir_watch_media_source_render(void *data, gs_effect_t *effect)
 			obs_source_update(parent, settings);
 		}
 		obs_data_array_release(array);
+	} else if (strcmp(id, S_IMAGE_SOURCE) == 0) {
+		obs_data_set_string(settings, S_FILE, context->file);
+		obs_source_update(parent, settings);
 	}
 	obs_data_release(settings);
 }
