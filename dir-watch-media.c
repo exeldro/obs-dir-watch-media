@@ -39,6 +39,7 @@
 #define S_DELETE_LAST_HOTKEY_ID "dwm_delete_last"
 #define S_DELETE_FIRST_HOTKEY_ID "dwm_delete_first"
 #define S_RANDOM_HOTKEY_ID "dwm_random"
+#define S_REFRESH_HOTKEY_ID "dwm_refresh"
 
 /* Translation */
 #define T_(s) obs_module_text(s)
@@ -47,6 +48,7 @@
 #define T_NAME T_("DWM.Name")
 #define T_CLEAR_HOTKEY_NAME T_("DWM.Clear")
 #define T_RANDOM_HOTKEY_NAME T_("DWM.Random")
+#define T_REFRESH_HOTKEY_NAME T_("DWM.Refresh")
 #define T_REMOVE_LAST_HOTKEY_NAME T_("DWM.Remove.Last")
 #define T_REMOVE_FIRST_HOTKEY_NAME T_("DWM.Remove.First")
 #define T_DELETE_LAST_HOTKEY_NAME T_("DWM.Delete.Last")
@@ -281,6 +283,26 @@ static void dir_watch_media_random(void *data, obs_hotkey_id hotkey_id,
 	dstr_free(&selected_path);
 }
 
+static void dir_watch_media_refresh(void *data, obs_hotkey_id hotkey_id,
+				  obs_hotkey_t *hotkey, bool pressed)
+{
+	struct dir_watch_media_source *context = data;
+
+	if (!pressed)
+		return;
+
+	obs_source_t *parent = obs_filter_get_parent(context->source);
+	if (!parent) {
+		return;
+	}
+
+	obs_data_t *settings = obs_source_get_settings(parent);
+	obs_source_update(parent, settings);
+	obs_data_release(settings);
+	UNUSED_PARAMETER(hotkey);
+	UNUSED_PARAMETER(hotkey_id);
+}
+
 static void dir_watch_media_remove(void *data, bool first, bool delete)
 {
 	struct dir_watch_media_source *context = data;
@@ -411,6 +433,9 @@ static void dir_watch_media_source_tick(void *data, float seconds)
 				   context);
 	obs_hotkey_register_source(parent, S_RANDOM_HOTKEY_ID,
 				   T_RANDOM_HOTKEY_NAME, dir_watch_media_random,
+				   context);
+	obs_hotkey_register_source(parent, S_REFRESH_HOTKEY_ID,
+				   T_REFRESH_HOTKEY_NAME, dir_watch_media_refresh,
 				   context);
 	const char *id = obs_source_get_unversioned_id(parent);
 	if (strcmp(id, S_VLC_SOURCE) != 0)
