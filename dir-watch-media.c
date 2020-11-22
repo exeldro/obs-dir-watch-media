@@ -296,9 +296,7 @@ static void dir_watch_media_refresh(void *data, obs_hotkey_id hotkey_id,
 		return;
 	}
 
-	obs_data_t *settings = obs_source_get_settings(parent);
-	obs_source_update(parent, settings);
-	obs_data_release(settings);
+	obs_source_update(parent, NULL);
 	UNUSED_PARAMETER(hotkey);
 	UNUSED_PARAMETER(hotkey_id);
 }
