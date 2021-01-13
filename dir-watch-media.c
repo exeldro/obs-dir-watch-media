@@ -418,71 +418,45 @@ static void dir_watch_media_source_tick(void *data, float seconds)
 			context->delete_file = NULL;
 		}
 	}
-
-	if (context->hotkeys_added)
-		return;
 	obs_source_t *parent = obs_filter_get_parent(context->source);
 	if (!parent)
 		return;
+	if (!context->hotkeys_added) {
+		context->hotkeys_added = true;
+		obs_hotkey_register_source(parent, S_CLEAR_HOTKEY_ID,
+					   T_CLEAR_HOTKEY_NAME,
+					   dir_watch_media_clear, context);
+		obs_hotkey_register_source(parent, S_RANDOM_HOTKEY_ID,
+					   T_RANDOM_HOTKEY_NAME,
+					   dir_watch_media_random, context);
+		obs_hotkey_register_source(parent, S_REFRESH_HOTKEY_ID,
+					   T_REFRESH_HOTKEY_NAME,
+					   dir_watch_media_refresh, context);
+		const char *id = obs_source_get_unversioned_id(parent);
+		if (strcmp(id, S_VLC_SOURCE) == 0) {
+			obs_hotkey_register_source(parent,
+						   S_REMOVE_LAST_HOTKEY_ID,
+						   T_REMOVE_LAST_HOTKEY_NAME,
+						   dir_watch_media_remove_last,
+						   context);
+			obs_hotkey_register_source(parent,
+						   S_REMOVE_FIRST_HOTKEY_ID,
+						   T_REMOVE_FIRST_HOTKEY_NAME,
+						   dir_watch_media_remove_first,
+						   context);
 
-	context->hotkeys_added = true;
-	obs_hotkey_register_source(parent, S_CLEAR_HOTKEY_ID,
-				   T_CLEAR_HOTKEY_NAME, dir_watch_media_clear,
-				   context);
-	obs_hotkey_register_source(parent, S_RANDOM_HOTKEY_ID,
-				   T_RANDOM_HOTKEY_NAME, dir_watch_media_random,
-				   context);
-	obs_hotkey_register_source(parent, S_REFRESH_HOTKEY_ID,
-				   T_REFRESH_HOTKEY_NAME, dir_watch_media_refresh,
-				   context);
-	const char *id = obs_source_get_unversioned_id(parent);
-	if (strcmp(id, S_VLC_SOURCE) != 0)
-		return;
-	obs_hotkey_register_source(parent, S_REMOVE_LAST_HOTKEY_ID,
-				   T_REMOVE_LAST_HOTKEY_NAME,
-				   dir_watch_media_remove_last, context);
-	obs_hotkey_register_source(parent, S_REMOVE_FIRST_HOTKEY_ID,
-				   T_REMOVE_FIRST_HOTKEY_NAME,
-				   dir_watch_media_remove_first, context);
-
-	obs_hotkey_register_source(parent, S_DELETE_LAST_HOTKEY_ID,
-				   T_DELETE_LAST_HOTKEY_NAME,
-				   dir_watch_media_delete_last, context);
-	obs_hotkey_register_source(parent, S_DELETE_FIRST_HOTKEY_ID,
-				   T_DELETE_FIRST_HOTKEY_NAME,
-				   dir_watch_media_delete_first, context);
-}
-
-static obs_properties_t *dir_watch_media_source_properties(void *data)
-{
-	struct dir_watch_media_source *s = data;
-
-	obs_properties_t *props = obs_properties_create();
-
-	obs_properties_add_path(props, S_DIRECTORY, T_DIRECTORY,
-				OBS_PATH_DIRECTORY, NULL, s->directory);
-	obs_property_t *prop = obs_properties_add_list(props, S_SORT_BY,
-						       T_SORT_BY,
-						       OBS_COMBO_TYPE_LIST,
-						       OBS_COMBO_FORMAT_INT);
-	obs_property_list_add_int(prop, T_CREATED_NEWEST, created_newest);
-	obs_property_list_add_int(prop, T_CREATED_OLDEST, created_oldest);
-	obs_property_list_add_int(prop, T_MODIFIED_NEWEST, modified_newest);
-	obs_property_list_add_int(prop, T_MODIFIED_OLDEST, modified_oldest);
-	obs_property_list_add_int(prop, T_ALPHA_FIRST, alphabetically_first);
-	obs_property_list_add_int(prop, T_ALPHA_LAST, alphabetically_last);
-
-	obs_properties_add_text(props, S_EXTENSION, T_EXTENSION,
-				OBS_TEXT_DEFAULT);
-	obs_properties_add_text(props, S_FILTER, T_FILTER, OBS_TEXT_DEFAULT);
-	return props;
-}
-
-void dir_watch_media_source_render(void *data, gs_effect_t *effect)
-{
-	UNUSED_PARAMETER(effect);
-	struct dir_watch_media_source *context = data;
-	obs_source_skip_video_filter(context->source);
+			obs_hotkey_register_source(parent,
+						   S_DELETE_LAST_HOTKEY_ID,
+						   T_DELETE_LAST_HOTKEY_NAME,
+						   dir_watch_media_delete_last,
+						   context);
+			obs_hotkey_register_source(parent,
+						   S_DELETE_FIRST_HOTKEY_ID,
+						   T_DELETE_FIRST_HOTKEY_NAME,
+						   dir_watch_media_delete_first,
+						   context);
+		}
+	}
 	if (!context->directory)
 		return;
 
@@ -593,10 +567,6 @@ void dir_watch_media_source_render(void *data, gs_effect_t *effect)
 	bfree(context->file);
 	context->file = bstrdup(selected_path.array);
 	dstr_free(&selected_path);
-	obs_source_t *parent = obs_filter_get_parent(context->source);
-	if (!parent) {
-		return;
-	}
 	obs_data_t *settings = obs_source_get_settings(parent);
 	const char *id = obs_source_get_unversioned_id(parent);
 	if (strcmp(id, S_FFMPEG_SOURCE) == 0) {
@@ -640,6 +610,32 @@ void dir_watch_media_source_render(void *data, gs_effect_t *effect)
 	}
 	obs_data_release(settings);
 }
+
+static obs_properties_t *dir_watch_media_source_properties(void *data)
+{
+	struct dir_watch_media_source *s = data;
+
+	obs_properties_t *props = obs_properties_create();
+
+	obs_properties_add_path(props, S_DIRECTORY, T_DIRECTORY,
+				OBS_PATH_DIRECTORY, NULL, s->directory);
+	obs_property_t *prop = obs_properties_add_list(props, S_SORT_BY,
+						       T_SORT_BY,
+						       OBS_COMBO_TYPE_LIST,
+						       OBS_COMBO_FORMAT_INT);
+	obs_property_list_add_int(prop, T_CREATED_NEWEST, created_newest);
+	obs_property_list_add_int(prop, T_CREATED_OLDEST, created_oldest);
+	obs_property_list_add_int(prop, T_MODIFIED_NEWEST, modified_newest);
+	obs_property_list_add_int(prop, T_MODIFIED_OLDEST, modified_oldest);
+	obs_property_list_add_int(prop, T_ALPHA_FIRST, alphabetically_first);
+	obs_property_list_add_int(prop, T_ALPHA_LAST, alphabetically_last);
+
+	obs_properties_add_text(props, S_EXTENSION, T_EXTENSION,
+				OBS_TEXT_DEFAULT);
+	obs_properties_add_text(props, S_FILTER, T_FILTER, OBS_TEXT_DEFAULT);
+	return props;
+}
+
 static void dir_watch_media_source_filter_remove(void *data,
 						 obs_source_t *parent)
 {
@@ -654,7 +650,6 @@ struct obs_source_info dir_watch_media_info = {
 	.destroy = dir_watch_media_source_destroy,
 	.update = dir_watch_media_source_update,
 	.get_defaults = dir_watch_media_source_defaults,
-	.video_render = dir_watch_media_source_render,
 	.video_tick = dir_watch_media_source_tick,
 	.get_properties = dir_watch_media_source_properties,
 	.filter_remove = dir_watch_media_source_filter_remove,
