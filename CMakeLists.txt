@@ -1,4 +1,4 @@
-project(dir-watch-media VERSION 0.5.1)
+project(dir-watch-media VERSION 0.5.2)
 set(PROJECT_FULL_NAME "Directory Watch Media")
 
 if(MSVC)

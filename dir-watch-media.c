@@ -33,6 +33,7 @@
 #define S_IMAGE_SOURCE "image_source"
 #define S_FILE "file"
 #define S_SORT_BY "sort_by"
+#define S_SCAN_INTERVAL "scan_interval"
 #define S_CLEAR_HOTKEY_ID "dwm_clear"
 #define S_REMOVE_LAST_HOTKEY_ID "dwm_remove_last"
 #define S_REMOVE_FIRST_HOTKEY_ID "dwm_remove_first"
@@ -62,6 +63,7 @@
 #define T_ALPHA_LAST T_("DWM.Alphabetically.Last")
 #define T_EXTENSION T_("DWM.Extension")
 #define T_FILTER T_("DWM.Filter")
+#define T_SCAN_INTERVAL T_("DWM.Interval")
 
 enum sort_by {
 	created_newest,
@@ -82,6 +84,8 @@ struct dir_watch_media_source {
 	enum sort_by sort_by;
 	time_t time;
 	bool hotkeys_added;
+	long long scan_interval;
+	float duration;
 };
 
 static const char *dir_watch_media_source_get_name(void *unused)
@@ -131,6 +135,7 @@ static void dir_watch_media_source_update(void *data, obs_data_t *settings)
 			context->time = 0;
 		}
 	}
+	context->scan_interval = obs_data_get_int(settings, S_SCAN_INTERVAL);
 }
 
 static void dir_watch_media_clear(void *data, obs_hotkey_id hotkey_id,
@@ -284,7 +289,7 @@ static void dir_watch_media_random(void *data, obs_hotkey_id hotkey_id,
 }
 
 static void dir_watch_media_refresh(void *data, obs_hotkey_id hotkey_id,
-				  obs_hotkey_t *hotkey, bool pressed)
+				    obs_hotkey_t *hotkey, bool pressed)
 {
 	struct dir_watch_media_source *context = data;
 
@@ -383,6 +388,7 @@ static void dir_watch_media_delete_first(void *data, obs_hotkey_id hotkey_id,
 static void dir_watch_media_source_defaults(obs_data_t *settings)
 {
 	obs_data_set_default_int(settings, S_SORT_BY, modified_newest);
+	obs_data_set_default_int(settings, S_SCAN_INTERVAL, 1000);
 }
 
 static void *dir_watch_media_source_create(obs_data_t *settings,
@@ -459,6 +465,12 @@ static void dir_watch_media_source_tick(void *data, float seconds)
 	}
 	if (!context->directory)
 		return;
+
+	context->duration += seconds;
+
+	if (context->duration * 1000.0f < (float)context->scan_interval)
+		return;
+	context->duration = 0.0f;
 
 	os_dir_t *dir = os_opendir(context->directory);
 	if (!dir)
@@ -633,6 +645,9 @@ static obs_properties_t *dir_watch_media_source_properties(void *data)
 	obs_properties_add_text(props, S_EXTENSION, T_EXTENSION,
 				OBS_TEXT_DEFAULT);
 	obs_properties_add_text(props, S_FILTER, T_FILTER, OBS_TEXT_DEFAULT);
+	prop = obs_properties_add_int(props, S_SCAN_INTERVAL, T_SCAN_INTERVAL,
+				      0, 1000000, 1000);
+	obs_property_int_set_suffix(prop, "ms");
 	return props;
 }
 
