@@ -656,6 +656,13 @@ static void dir_watch_media_source_filter_remove(void *data,
 {
 }
 
+void dir_watch_media_source_render(void *data, gs_effect_t *effect)
+{
+	UNUSED_PARAMETER(effect);
+	struct dir_watch_media_source *context = data;
+	obs_source_skip_video_filter(context->source);
+}
+
 struct obs_source_info dir_watch_media_info = {
 	.id = S_DWM_ID,
 	.type = OBS_SOURCE_TYPE_FILTER,
@@ -666,6 +673,7 @@ struct obs_source_info dir_watch_media_info = {
 	.update = dir_watch_media_source_update,
 	.get_defaults = dir_watch_media_source_defaults,
 	.video_tick = dir_watch_media_source_tick,
+	.video_render = dir_watch_media_source_render,
 	.get_properties = dir_watch_media_source_properties,
 	.filter_remove = dir_watch_media_source_filter_remove,
 };
