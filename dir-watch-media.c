@@ -3,6 +3,7 @@
 #include <util/platform.h>
 #include <util/dstr.h>
 #include <sys/stat.h>
+#include "version.h"
 
 #define do_log(level, format, ...)                     \
 	blog(level, "[dir_watch_media: '%s'] " format, \
@@ -563,24 +564,31 @@ static void dir_watch_media_source_tick(void *data, float seconds)
 	dstr_free(&dir_path);
 	os_closedir(dir);
 	if (!selected_path.array || !selected_path.len) {
-		dstr_free(&selected_path);
-		return;
+		if (context->file && strcmp(context->file, "") == 0) {
+			dstr_free(&selected_path);
+			return;
+		}
+		bfree(context->file);
+		context->file = bstrdup("");
+	} else {
+		if (context->file &&
+		    strcmp(context->file, selected_path.array) == 0) {
+			dstr_free(&selected_path);
+
+			return;
+		}
+		FILE *f = os_fopen(selected_path.array, "rb+");
+		if (!f) {
+			dstr_free(&selected_path);
+			return;
+		}
+		fclose(f);
+		bfree(context->file);
+		context->file = bstrdup(selected_path.array);
 	}
-	if (context->file && strcmp(context->file, selected_path.array) == 0) {
-		dstr_free(&selected_path);
-		return;
-	}
-	FILE *f = os_fopen(selected_path.array, "rb+");
-	if (!f) {
-		dstr_free(&selected_path);
-		return;
-	}
-	fclose(f);
-	bfree(context->file);
-	context->file = bstrdup(selected_path.array);
 	dstr_free(&selected_path);
-	obs_data_t *settings = obs_source_get_settings(parent);
 	const char *id = obs_source_get_unversioned_id(parent);
+	obs_data_t *settings = obs_source_get_settings(parent);
 	if (strcmp(id, S_FFMPEG_SOURCE) == 0) {
 		obs_data_set_string(settings, S_LOCAL_FILE, context->file);
 		obs_data_set_bool(settings, S_IS_LOCAL_FILE, true);
@@ -591,7 +599,7 @@ static void dir_watch_media_source_tick(void *data, float seconds)
 			proc_handler_call(ph, S_RESTART, &cd);
 			calldata_free(&cd);
 		}
-	} else if (strcmp(id, S_VLC_SOURCE) == 0) {
+	} else if (strcmp(id, S_VLC_SOURCE) == 0 && strlen(context->file)) {
 		obs_data_array_t *array =
 			obs_data_get_array(settings, S_PLAYLIST);
 		if (!array) {
@@ -679,6 +687,7 @@ struct obs_source_info dir_watch_media_info = {
 };
 
 OBS_DECLARE_MODULE()
+OBS_MODULE_AUTHOR("Exeldro");
 OBS_MODULE_USE_DEFAULT_LOCALE("dir-watch-media", "en-US")
 MODULE_EXPORT const char *obs_module_description(void)
 {
@@ -687,6 +696,7 @@ MODULE_EXPORT const char *obs_module_description(void)
 
 bool obs_module_load(void)
 {
+	blog(LOG_INFO, "[Directory watch media] loaded version %s", PROJECT_VERSION);
 	obs_register_source(&dir_watch_media_info);
 	return true;
 }
