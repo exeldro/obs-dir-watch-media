@@ -62,6 +62,7 @@
 #define T_MODIFIED_OLDEST T_("DWM.Modified.Oldest")
 #define T_ALPHA_FIRST T_("DWM.Alphabetically.First")
 #define T_ALPHA_LAST T_("DWM.Alphabetically.Last")
+#define T_RANDOM T_("DWM.Random")
 #define T_EXTENSION T_("DWM.Extension")
 #define T_FILTER T_("DWM.Filter")
 #define T_SCAN_INTERVAL T_("DWM.Interval")
@@ -73,6 +74,7 @@ enum sort_by {
 	modified_oldest,
 	alphabetically_first,
 	alphabetically_last,
+	sort_random,
 };
 
 struct dir_watch_media_source {
@@ -87,6 +89,7 @@ struct dir_watch_media_source {
 	bool hotkeys_added;
 	long long scan_interval;
 	float duration;
+	bool enabled;
 };
 
 static const char *dir_watch_media_source_get_name(void *unused)
@@ -466,10 +469,18 @@ static void dir_watch_media_source_tick(void *data, float seconds)
 	}
 	if (!context->directory)
 		return;
+	if (context->enabled != obs_source_enabled(context->source)) {
+		context->enabled = !context->enabled;
+		if (!context->enabled && context->scan_interval == 0) {
+			return;
+		}
+	} else if (context->scan_interval == 0)
+		return;
 
 	context->duration += seconds;
 
-	if (context->duration * 1000.0f < (float)context->scan_interval)
+	if (context->scan_interval != 0 &&
+	    context->duration * 1000.0f < (float)context->scan_interval)
 		return;
 	context->duration = 0.0f;
 
@@ -484,6 +495,7 @@ static void dir_watch_media_source_tick(void *data, float seconds)
 	time_t time = context->time;
 	char *file = NULL;
 
+	long long count = 0;
 	struct os_dirent *ent = os_readdir(dir);
 	while (ent) {
 		if (ent->directory) {
@@ -499,6 +511,17 @@ static void dir_watch_media_source_tick(void *data, float seconds)
 		if (context->extension && extension &&
 		    astrcmpi(context->extension, extension) != 0 &&
 		    astrcmpi(context->extension, extension + 1)) {
+			ent = os_readdir(dir);
+			continue;
+		}
+		if (context->sort_by == sort_random) {
+			count++;
+			const int r = rand();
+			if (count <= 1 || r % count == 0) {
+				dstr_copy(&selected_path, context->directory);
+				dstr_cat_ch(&selected_path, '/');
+				dstr_cat(&selected_path, ent->d_name);
+			}
 			ent = os_readdir(dir);
 			continue;
 		}
@@ -649,6 +672,7 @@ static obs_properties_t *dir_watch_media_source_properties(void *data)
 	obs_property_list_add_int(prop, T_MODIFIED_OLDEST, modified_oldest);
 	obs_property_list_add_int(prop, T_ALPHA_FIRST, alphabetically_first);
 	obs_property_list_add_int(prop, T_ALPHA_LAST, alphabetically_last);
+	obs_property_list_add_int(prop, T_RANDOM, sort_random);
 
 	obs_properties_add_text(props, S_EXTENSION, T_EXTENSION,
 				OBS_TEXT_DEFAULT);
@@ -696,7 +720,8 @@ MODULE_EXPORT const char *obs_module_description(void)
 
 bool obs_module_load(void)
 {
-	blog(LOG_INFO, "[Directory watch media] loaded version %s", PROJECT_VERSION);
+	blog(LOG_INFO, "[Directory watch media] loaded version %s",
+	     PROJECT_VERSION);
 	obs_register_source(&dir_watch_media_info);
 	return true;
 }

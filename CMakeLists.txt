@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.12..4.0)
 
-project(dir-watch-media VERSION 0.6.0)
+project(dir-watch-media VERSION 0.6.1)
 set(PROJECT_FULL_NAME "Directory Watch Media")
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/version.h.in ${CMAKE_CURRENT_SOURCE_DIR}/version.h)
