@@ -472,6 +472,8 @@ static void dir_watch_media_source_tick(void *data, float seconds)
 	if (context->enabled != obs_source_enabled(context->source)) {
 		context->enabled = !context->enabled;
 		if (!context->enabled && context->scan_interval == 0) {
+			bfree(context->file);
+			context->file = NULL;
 			return;
 		}
 	} else if (context->scan_interval == 0)
@@ -508,8 +510,8 @@ static void dir_watch_media_source_tick(void *data, float seconds)
 			continue;
 		}
 		const char *extension = os_get_path_extension(ent->d_name);
-		if (context->extension && extension &&
-		    astrcmpi(context->extension, extension) != 0 &&
+		if (context->extension && strlen(context->extension) &&
+		    extension && astrcmpi(context->extension, extension) != 0 &&
 		    astrcmpi(context->extension, extension + 1)) {
 			ent = os_readdir(dir);
 			continue;
