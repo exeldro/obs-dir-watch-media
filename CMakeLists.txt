@@ -1,21 +1,33 @@
-cmake_minimum_required(VERSION 3.12..4.0)
+# --- Detect if the plugin is build out of tree or not ---
+if(CMAKE_PROJECT_NAME STREQUAL "obs-studio")
+  set(BUILD_OUT_OF_TREE OFF)
+else()
+  set(BUILD_OUT_OF_TREE ON)
+  cmake_minimum_required(VERSION 3.18)
+endif()
 
-project(dir-watch-media VERSION 0.6.1)
+project(dir-watch-media VERSION 0.6.2)
 set(PROJECT_FULL_NAME "Directory Watch Media")
+
+# Set new UUIDs when you start to create a new plugin.
+set(MACOS_PACKAGE_UUID "AA2D9C73-418B-4680-9B70-5740DEE8340E")
+set(MACOS_INSTALLER_UUID "BEA2887C-4DA5-4BE1-862C-64DDB55B2ADB")
+
+add_library(${PROJECT_NAME} MODULE)
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/version.h.in ${CMAKE_CURRENT_SOURCE_DIR}/version.h)
 
-if(MSVC)
-	set(dir-watch-media_PLATFORM_DEPS
-		w32-pthreads)
+target_sources(${PROJECT_NAME} PRIVATE
+	dir-watch-media.c
+	dir-watch-media.h
+	version.h)
+
+if(BUILD_OUT_OF_TREE)
+	find_package(libobs REQUIRED)
+	include(cmake/ObsPluginHelpers.cmake)
 endif()
-
-set(dir-watch-media_HEADERS
-	dir-watch-media.h)
-set(dir-watch-media_SOURCES
-	dir-watch-media.c)
-
-if(WIN32)
+  
+if(OS_WINDOWS)
 	get_filename_component(ISS_FILES_DIR "${CMAKE_BINARY_DIR}\\..\\package" ABSOLUTE)
 	file(TO_NATIVE_PATH "${ISS_FILES_DIR}" ISS_FILES_DIR)
 	get_filename_component(ISS_PACKAGE_DIR "${CMAKE_PACKAGE_PREFIX}\\.." ABSOLUTE)
@@ -25,37 +37,36 @@ if(WIN32)
 	configure_file("installer.iss.in"
 			"${PROJECT_BINARY_DIR}/installer.iss"
 		)
-	configure_file(resource.rc.in dir-watch-media.rc)
-	list(APPEND dir-watch-media_SOURCES
-		dir-watch-media.rc)
+	configure_file(${CMAKE_CURRENT_SOURCE_DIR}/resource.rc.in ${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}.rc)
+	target_sources(${PROJECT_NAME} PRIVATE 
+		${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}.rc)
+elseif(OS_MACOS)
+		set(MACOS_BUNDLEID "com.exeldro.${PROJECT_NAME}")
+		set(MACOSX_PLUGIN_GUI_IDENTIFIER "${MACOS_BUNDLEID}")
+		set(MACOSX_PLUGIN_BUNDLE_VERSION "${PROJECT_VERSION}")
+		set(MACOSX_PLUGIN_SHORT_VERSION_STRING "1")
+		configure_file(cmake/bundle/macos/installer-macos.pkgproj.in ${CMAKE_BINARY_DIR}/installer-macos.generated.pkgproj)
+		target_compile_options(${PROJECT_NAME} PRIVATE -Wall)
 endif()
 
-if(BUILD_OUT_OF_TREE)
-    find_package(LibObs REQUIRED)
-endif()
-
-add_library(dir-watch-media MODULE
-	${dir-watch-media_HEADERS}
-	${dir-watch-media_SOURCES})
-target_link_libraries(dir-watch-media
-	libobs
-	${dir-watch-media_PLATFORM_DEPS})
+target_link_libraries(${PROJECT_NAME}
+	OBS::libobs)
 
 if(BUILD_OUT_OF_TREE)
     if(NOT LIB_OUT_DIR)
         set(LIB_OUT_DIR "/lib/obs-plugins")
     endif()
     if(NOT DATA_OUT_DIR)
-        set(DATA_OUT_DIR "/share/obs/obs-plugins/dir-watch-media")
+        set(DATA_OUT_DIR "/share/obs/obs-plugins/${PROJECT_NAME}")
     endif()
-    set_target_properties(dir-watch-media PROPERTIES PREFIX "")
-    install(TARGETS dir-watch-media
+    set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "")
+    install(TARGETS ${PROJECT_NAME}
         LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/${LIB_OUT_DIR})
     install(DIRECTORY data/locale
         DESTINATION ${CMAKE_INSTALL_PREFIX}/${DATA_OUT_DIR})
 else()
-    target_include_directories(dir-watch-media PRIVATE
+    target_include_directories(${PROJECT_NAME} PRIVATE
         "${CMAKE_SOURCE_DIR}/UI/obs-frontend-api")
-    set_target_properties(dir-watch-media PROPERTIES FOLDER "plugins/exeldro")
-    install_obs_plugin_with_data(dir-watch-media data)
+    set_target_properties(${PROJECT_NAME} PROPERTIES FOLDER "plugins/exeldro")
 endif()
+setup_plugin_target(${PROJECT_NAME})

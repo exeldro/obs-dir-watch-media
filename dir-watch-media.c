@@ -174,7 +174,6 @@ static void dir_watch_media_clear(void *data, obs_hotkey_id hotkey_id,
 			array = obs_data_array_create();
 			obs_data_set_array(settings, S_PLAYLIST, array);
 		}
-		bool twice = false;
 		size_t count = obs_data_array_count(array);
 		for (size_t i = 0; i < count; i++) {
 			obs_data_array_erase(array, 0);
@@ -193,6 +192,8 @@ static void dir_watch_media_clear(void *data, obs_hotkey_id hotkey_id,
 static void dir_watch_media_random(void *data, obs_hotkey_id hotkey_id,
 				   obs_hotkey_t *hotkey, bool pressed)
 {
+	UNUSED_PARAMETER(hotkey);
+	UNUSED_PARAMETER(hotkey_id);
 	struct dir_watch_media_source *context = data;
 
 	if (!pressed)
@@ -685,11 +686,6 @@ static obs_properties_t *dir_watch_media_source_properties(void *data)
 	return props;
 }
 
-static void dir_watch_media_source_filter_remove(void *data,
-						 obs_source_t *parent)
-{
-}
-
 void dir_watch_media_source_render(void *data, gs_effect_t *effect)
 {
 	UNUSED_PARAMETER(effect);
@@ -709,7 +705,6 @@ struct obs_source_info dir_watch_media_info = {
 	.video_tick = dir_watch_media_source_tick,
 	.video_render = dir_watch_media_source_render,
 	.get_properties = dir_watch_media_source_properties,
-	.filter_remove = dir_watch_media_source_filter_remove,
 };
 
 OBS_DECLARE_MODULE()
