@@ -42,6 +42,7 @@
 #define S_DELETE_FIRST_HOTKEY_ID "dwm_delete_first"
 #define S_RANDOM_HOTKEY_ID "dwm_random"
 #define S_REFRESH_HOTKEY_ID "dwm_refresh"
+#define S_ASYNC_IMAGE_SOURCE "xObsAsyncImageSource"
 
 /* Translation */
 #define T_(s) obs_module_text(s)
@@ -180,7 +181,8 @@ static void dir_watch_media_clear(void *data, obs_hotkey_id hotkey_id,
 		}
 		obs_source_update(parent, settings);
 		obs_data_array_release(array);
-	} else if (strcmp(id, S_IMAGE_SOURCE) == 0) {
+	} else if (strcmp(id, S_IMAGE_SOURCE) == 0 ||
+		   strcmp(id, S_ASYNC_IMAGE_SOURCE) == 0) {
 		obs_data_set_string(settings, S_FILE, "");
 		obs_source_update(parent, settings);
 	}
@@ -285,7 +287,8 @@ static void dir_watch_media_random(void *data, obs_hotkey_id hotkey_id,
 			obs_source_update(parent, settings);
 		}
 		obs_data_array_release(array);
-	} else if (strcmp(id, S_IMAGE_SOURCE) == 0) {
+	} else if (strcmp(id, S_IMAGE_SOURCE) == 0 ||
+		   strcmp(id, S_ASYNC_IMAGE_SOURCE) == 0) {
 		obs_data_set_string(settings, S_FILE, selected_path.array);
 		obs_source_update(parent, settings);
 	}
@@ -650,7 +653,8 @@ static void dir_watch_media_source_tick(void *data, float seconds)
 			obs_source_update(parent, settings);
 		}
 		obs_data_array_release(array);
-	} else if (strcmp(id, S_IMAGE_SOURCE) == 0) {
+	} else if (strcmp(id, S_IMAGE_SOURCE) == 0 ||
+		   strcmp(id, S_ASYNC_IMAGE_SOURCE) == 0) {
 		obs_data_set_string(settings, S_FILE, context->file);
 		obs_source_update(parent, settings);
 	}
