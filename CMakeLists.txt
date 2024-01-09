@@ -9,7 +9,7 @@ else()
   cmake_minimum_required(VERSION 3.18)
 endif()
 
-project(dir-watch-media VERSION 0.6.2)
+project(dir-watch-media VERSION 0.7.0)
 set(PROJECT_FULL_NAME "Directory Watch Media")
 
 # Set new UUIDs when you start to create a new plugin.
